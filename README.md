@@ -1,5 +1,6 @@
 # MAV System
 
-[예제 모델 다운로드 링크](https://drive.google.com/drive/folders/18gmyh8X8txZcZR5kVMooV46RQY7ezoqv?usp=sharing)
+[예제 데이터 다운로드 링크 - src 파일 내에 넣어서 실행](https://drive.google.com/drive/folders/18gLCsZabucBGmI-cDvwcjQx5Qo-XN5dZ?usp=sharing)
+
 ![ex](/assets/ex.png)
 
