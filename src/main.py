@@ -1,39 +1,30 @@
-import sys
+# -*- coding: utf-8 -*- 
 import os
-from file_management.load_file import read_excel
-from dialogs.generate_dialog import *
-from PyQt5.QtWidgets import *
-from PyQt5 import uic, QtGui
-
-from PyQt5.QtCore import pyqtSlot, QEventLoop
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMessageBox
+import sys
 import numpy as np 
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+from PyQt5 import uic, QtGui
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import pyqtSlot, QEventLoop
+
+from utils import read_excel, StdoutRedirect, generate_messagebox
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-# from nrf_setting import ModelSetting
 
-from nrf_coverage_rate import CoverageRate
-from nrf_crash_visualization import CrashVisualization
-from nrf_attacks import Attacks
-from stdout_redirect import StdoutRedirect
-# SHOT_SIZE, SHOT_ANGLE, SUB_OBJ = 0, 1, 2
-# data_labels = {0: ("", "extreme close-up", "close-up", "middle", "full", "long", "extreme long"), 1: ("", "high", "eye", "low"), 2: ("", "obj", "sub")}
-
-# check detail : 커버리지 측정 표 수치 알아서 나오도록 
+from utils.coverage_rate import CoverageRate
+from utils.crash_visualization import PCAVisualization
+from utils.attacks import Attacks
 
 form_class=uic.loadUiType("main.ui")[0]
   
-
 class MyWindow(QMainWindow, form_class):
+    
     def __init__(self):
         super().__init__()
         self.left=10
         self.top=10
-        self.title='딥러닝 모델 취약점 분석 프로그램'
-        self.width=1280
-        self.height=800
+        self.title = '딥러닝 모델 취약점 분석 프로그램'
+        self.width = 1280
+        self.height = 800
         self.setupUi(self)
         self.setWindowTitle(self.title)
         self.attackData = None
@@ -50,7 +41,6 @@ class MyWindow(QMainWindow, form_class):
                        'fgsm_0.2': 'red', 'pgd_0.2': 'black'} 
 
         # model & dataset 관련
-        
         self.addToolBar(NavigationToolbar(self.GraphWidget.canvas, self))
         self.loadFileBtn.clicked.connect(self.loadFile_clicked)
         self.loadFileBtn_2.clicked.connect(self.loadFile2_clicked)
@@ -70,7 +60,6 @@ class MyWindow(QMainWindow, form_class):
     
         self.coverageRateBtn.clicked.connect(self.coverageRate_clicked)
         self.PCAGraphBtn.clicked.connect(self.PCAGraph_clicked)
-        # self.defenseBtn.clicked.connecT(self.defense_clicked)
         self.selectedLabelBox.currentIndexChanged.connect(self.label_changed)
         self.dimensionBox.currentIndexChanged.connect(self.dimension_combobox_selected)
         
@@ -87,6 +76,7 @@ class MyWindow(QMainWindow, form_class):
         
     @pyqtSlot()
     def loadFile_clicked(self):
+        """ 파일 로드 함수 """
         fname=QFileDialog.getOpenFileName()
         if fname[0]:
             fileName=os.path.basename(fname[0])
@@ -98,6 +88,7 @@ class MyWindow(QMainWindow, form_class):
                 
     @pyqtSlot()
     def loadFile2_clicked(self):
+        """ 파일 로드 함수 """
         fname=QFileDialog.getOpenFileName()
         if fname[0]:
             fileName=os.path.basename(fname[0])
@@ -105,6 +96,8 @@ class MyWindow(QMainWindow, form_class):
             filePath=os.path.splitext(fname[0])
 
     def model_combobox_selected(self):
+        """ 검증 대상 모델 선택 함수 """
+        # TODO : 모델을 직접 선택할 수 있도록 확장 예정
         if self.model_combobox.currentText() == 'lenet5 & mnist':
             self.dataset = 'mnist'
         elif self.model_combobox.currentText() == 'vgg19 & cifar10':
@@ -117,6 +110,7 @@ class MyWindow(QMainWindow, form_class):
         print(self.dataset, " loaded")
         
     def attack_combobox_selected(self):
+        """ 검증 공격 기법 선택 함수 """
         self.selectedAttack = self.attack_combobox.currentText().lower()
         if self.selectedAttack == '':
             self.attackBtn.setDisabled(True)
@@ -126,6 +120,7 @@ class MyWindow(QMainWindow, form_class):
             self.attackBtn.setDisabled(True)
         
     def fuzzing_combobox_selected(self):
+        """ 검증 기법 선택 함수 """
         self.selectedFuzzingCoverage = self.fuzzing_combobox.currentText().lower()
         if self.selectedFuzzingCoverage == '':
             self.fuzzingBtn.setDisabled(True)
@@ -135,6 +130,7 @@ class MyWindow(QMainWindow, form_class):
             self.fuzzingBtn.setDisabled(True)
             
     def attackBtn_clicked(self):
+        """ 공격 실행 함수 """
         print(self.selectedAttack + " 공격 실행")
         generate_messagebox(self, self.selectedAttack, '공격을 실행합니다.')
         self.attackData = Attacks(self.dataset, self.selectedAttack) 
@@ -154,6 +150,7 @@ class MyWindow(QMainWindow, form_class):
         self.draw_graph()
                 
     def fuzzingBtn_clicked(self):
+        """ 퍼징 실행 함수 """
         print(self.selectedFuzzingCoverage + " 퍼징 실행")
         generate_messagebox(self, self.selectedFuzzingCoverage, '퍼징을 실행합니다.')
         if self.selectedFuzzingCoverage == "nc":
@@ -164,6 +161,7 @@ class MyWindow(QMainWindow, form_class):
             self.fuzzing_nbc_checkbox.setEnabled(True)
     
     def analysis_checked(self):
+        """ 커버리지 및 PCA 분석 실행 함수 """
         if self.attack_fgsm_checkbox.isChecked(): self.attacks.add('fgsm_0.2')
         else: self.attacks.discard('fgsm_0.2')
             
@@ -190,6 +188,7 @@ class MyWindow(QMainWindow, form_class):
         self.currentLabel = self.selectedLabelBox.currentText()
 
     def coverageRate_clicked(self):
+        """ coverage 그래프 시각화 함수 """
         if not self.coverageRate:
             self.coverageRate = CoverageRate(self.dataset, (self.attacks | self.fuzzingCoverages) )
             generate_messagebox(self, self.selectedFuzzingCoverage, ' 실행합니다.')
@@ -208,8 +207,9 @@ class MyWindow(QMainWindow, form_class):
         self.graphChangeBtn.setEnabled(True)
         
     def PCAGraph_clicked(self):
+        """ PCA 그래프 시각화 함수 """
         if not self.crashVisualization:
-            self.crashVisualization = CrashVisualization(self.dataset, (self.attacks | self.fuzzingCoverages))
+            self.crashVisualization = PCAVisualization(self.dataset, (self.attacks | self.fuzzingCoverages))
             generate_messagebox(self, self.selectedFuzzingCoverage, ' 실행합니다.')
             self.crashVisualization.measure_neuronMetrics()
             self.crashVisualization.measure_attackMetrics()
@@ -233,11 +233,11 @@ class MyWindow(QMainWindow, form_class):
         self.draw_graph()
     
     def draw_graph(self):
-
+        " PCA graph 시각화 함수 "
         self.GraphWidget.init_graph()
         if self.method == 'pca':
             source = int(self.currentLabel)
-            if self.dimension == 2:
+            if self.dimension == 2: # 2차원인 경우
                 self.GraphWidget.canvas.axes = self.GraphWidget.fig.add_subplot(1,1,1)
                 x_points = dict()
                 y_points = dict()
@@ -246,7 +246,7 @@ class MyWindow(QMainWindow, form_class):
                     x_points[metric] = self.crashVisualization.pcas[source][metric][:, 0]
                     y_points[metric] = self.crashVisualization.pcas[source][metric][:, 1]
                     self.GraphWidget.canvas.axes.scatter(x_points[metric], y_points[metric], label = metric, color=self.colors[metric], s=15, alpha=1, marker='+', linewidth=0.5)    
-            elif self.dimension == 3:
+            elif self.dimension == 3: # 3차원인 경우
                 self.GraphWidget.canvas.axes = self.GraphWidget.fig.gca(projection='3d')
                 x_points = dict()
                 y_points = dict()
@@ -287,13 +287,11 @@ class MyWindow(QMainWindow, form_class):
             
         self.GraphWidget.canvas.axes.spines['right'].set_visible(False)
         self.GraphWidget.canvas.axes.spines['top'].set_visible(False)
-          #     self.GraphWidget.canvas.axes.set_zlabel("subj-obj")
         self.GraphWidget.canvas.axes.legend()
         self.GraphWidget.canvas.draw()        
     
     def append_text(self, msg):
         self.textBrowser.moveCursor(QtGui.QTextCursor.End)
-        # self.textBrowser.setText(msg)
         self.textBrowser.insertPlainText(msg)
         QApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
 
